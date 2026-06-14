@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouthConnect Rwanda</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      display: flex;
+    }
+
+    .sidebar {
+      width: 220px;
+      background: #1f2937;
+      color: white;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .menu li {
+      list-style: none;
+      padding: 10px;
+      margin: 6px 0;
+      background: #374151;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .menu li:hover {
+      background: #4b5563;
+    }
+
+    .main {
+      flex: 1;
+      padding: 15px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      transition: 0.2s;
+    }
+
+    .card:hover {
+      transform: scale(1.01);
+    }
+
+    textarea {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+
+    button {
+      background: #1877f2;
+      color: white;
+      border: none;
+      padding: 7px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+
+    .user {
+      color: #1877f2;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .like {
+      color: #e11d48;
+      cursor: pointer;
+      display: inline-block;
+      margin-top: 5px;
+    }
+
+    .online {
+      font-size: 12px;
+      color: green;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="sidebar">
+  <h2>YouthConnect</h2>
+  <ul class="menu">
+    <li onclick="goProfile()">Profile</li>
+    <li onclick="goNotif()">Notifications</li>
+    <li onclick="goChat()">Messages</li>
+    <li onclick="logout()">Logout</li>
+  </ul>
+</div>
+
+<div class="main">
+
+  <div class="card" id="userCard">Loading...</div>
+
+  <div class="card">
+    <h3>Create Post</h3>
+    <textarea id="postText" placeholder="What's on your mind?"></textarea>
+    <button onclick="createPost()">Post</button>
+  </div>
+
+  <div id="feed"></div>
+
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+import {
+  getAuth,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
+
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  query,
+  onSnapshot,
+  serverTimestamp,
+  doc,
+  getDoc,
+  updateDoc,
+  arrayUnion,
+  arrayRemove,
+  orderBy,
+  setDoc
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCcHlQTDGsF5lBNNzrOtpRkiaBhrjkIE4M",
+  authDomain: "youth-connect-rwanda.firebaseapp.com",
+  projectId: "youth-connect-rwanda"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let currentUserId = "";
+let currentName = "";
+
+/* AUTH */
+onAuthStateChanged(auth, async (user) => {
+  if (!user) return (window.location.href = "index.html");
+
+  currentUserId = user.uid;
+
+  const snap = await getDoc(doc(db, "users", user.uid));
+
+  currentName =
+    snap.exists() && snap.data().name
+      ? snap.data().name
+      : user.email.split("@")[0];
+
+  document.getElementById("userCard").innerHTML =
+    `<h2>Welcome 🎉 ${currentName}</h2>`;
+
+  /* ONLINE STATUS */
+  await setDoc(doc(db, "users", currentUserId), {
+    lastSeen: serverTimestamp()
+  }, { merge: true });
+
+  setInterval(async () => {
+    await setDoc(doc(db, "users", currentUserId), {
+      lastSeen: serverTimestamp()
+    }, { merge: true });
+  }, 30000);
+
+  loadPosts();
+});
+
+/* CREATE POST */
+window.createPost = async function () {
+  const text = document.getElementById("postText").value;
+  if (!text) return;
+
+  await addDoc(collection(db, "posts"), {
+    text,
+    name: currentName,
+    userId: currentUserId,
+    likes: [],
+    time: serverTimestamp()
+  });
+
+  document.getElementById("postText").value = "";
+};
+
+/* LOAD POSTS */
+function loadPosts() {
+  onSnapshot(query(collection(db, "posts"), orderBy("time", "desc")), (snap) => {
+    const feed = document.getElementById("feed");
+    feed.innerHTML = "";
+
+    snap.forEach(p => {
+      const post = p.data();
+      const liked = (post.likes || []).includes(currentUserId);
+
+      feed.innerHTML += `
+        <div class="card">
+          <span class="user" onclick="openProfile('${post.userId}')">
+            ${post.name}
+          </span>
+
+          <p>${post.text}</p>
+
+          <span class="like" onclick="likePost('${p.id}')">
+            ${liked ? "❤️ Unlike" : "🤍 Like"} (${(post.likes || []).length})
+          </span>
+
+          <div>
+            <input placeholder="Comment..." id="c_${p.id}">
+            <button onclick="comment('${p.id}')">Send</button>
+          </div>
+        </div>
+      `;
+    });
+  });
+}
+
+/* LIKE */
+window.likePost = async function(postId) {
+  const ref = doc(db, "posts", postId);
+  const snap = await getDoc(ref);
+
+  const post = snap.data();
+  const likes = post.likes || [];
+
+  if (likes.includes(currentUserId)) {
+    await updateDoc(ref, {
+      likes: arrayRemove(currentUserId)
+    });
+  } else {
+    await updateDoc(ref, {
+      likes: arrayUnion(currentUserId)
+    });
+  }
+};
+
+/* COMMENT */
+window.comment = async function(postId) {
+  const input = document.getElementById("c_" + postId);
+  const text = input.value;
+
+  if (!text) return;
+
+  const postSnap = await getDoc(doc(db, "posts", postId));
+  const post = postSnap.data();
+
+  await addDoc(collection(db, "comments"), {
+    postId,
+    text,
+    userId: currentUserId,
+    name: currentName,
+    time: serverTimestamp()
+  });
+
+  if (post.userId !== currentUserId) {
+    await addDoc(collection(db, "notifications"), {
+      to: post.userId,
+      text: `${currentName} commented on your post`,
+      type: "comment",
+      time: serverTimestamp()
+    });
+  }
+
+  input.value = "";
+};
+
+/* NAV */
+window.openProfile = id => window.location.href = "profile.html?id=" + id;
+window.goProfile = () => window.location.href = "profile.html?id=" + currentUserId;
+window.goNotif = () => window.location.href = "notifications.html";
+window.goChat = () => window.location.href = "chat.html";
+
+window.logout = () => signOut(auth).then(() => window.location.href = "index.html");
+
+</script>
+
+</body>
+</html>

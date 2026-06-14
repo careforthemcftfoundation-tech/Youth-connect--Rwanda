@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #f0f2f5;
+      padding: 15px;
+    }
+
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 12px;
+      margin-bottom: 10px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+
+    button {
+      background: #1877f2;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-top: 8px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="card" id="profileBox">Loading...</div>
+
+<div class="card">
+  <h3>Edit Profile</h3>
+  <input id="newName" placeholder="Enter new name">
+  <button onclick="updateName()">Save</button>
+</div>
+
+<div id="posts"></div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  getDocs
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+import { getAuth } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyCcHlQTDGsF5lBNNzrOtpRkiaBhrjkIE4M",
+  authDomain: "youth-connect-rwanda.firebaseapp.com",
+  projectId: "youth-connect-rwanda"
+});
+
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+const id = new URLSearchParams(window.location.search).get("id");
+
+let currentUser = auth.currentUser;
+
+/* LOAD PROFILE */
+async function load() {
+  const userSnap = await getDoc(doc(db, "users", id));
+
+  const u = userSnap.data();
+
+  document.getElementById("profileBox").innerHTML = `
+    <h2>${u.name || "User"}</h2>
+    <p>${u.email || ""}</p>
+  `;
+
+  const posts = await getDocs(
+    query(collection(db, "posts"), where("userId", "==", id))
+  );
+
+  const box = document.getElementById("posts");
+  box.innerHTML = "";
+
+  posts.forEach(p => {
+    box.innerHTML += `
+      <div class="card">
+        <b>${p.data().name}</b>
+        <p>${p.data().text}</p>
+      </div>
+    `;
+  });
+}
+
+/* UPDATE NAME */
+window.updateName = async function () {
+  const newName = document.getElementById("newName").value;
+
+  if (!newName) return;
+
+  await updateDoc(doc(db, "users", id), {
+    name: newName
+  });
+
+  alert("Profile updated!");
+  load();
+};
+
+load();
+
+</script>
+
+</body>
+</html>

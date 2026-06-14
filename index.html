@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>YouthConnect Rwanda - Login</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #f2f2f2;
+      text-align: center;
+      padding-top: 80px;
+    }
+
+    .box {
+      background: white;
+      width: 320px;
+      margin: auto;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0px 0px 10px #ccc;
+    }
+
+    input {
+      width: 90%;
+      padding: 10px;
+      margin: 8px 0;
+    }
+
+    button {
+      width: 95%;
+      padding: 10px;
+      margin: 5px;
+      background: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="box">
+  <h2>YouthConnect Rwanda</h2>
+
+  <!-- NEW: NAME INPUT -->
+  <input id="name" placeholder="Full Name">
+
+  <input id="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Password">
+
+  <button onclick="signup()">Create Account</button>
+  <button onclick="login()">Login</button>
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
+
+import {
+  getFirestore,
+  doc,
+  setDoc
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyCcHlQTDGsF5lBNNzrOtpRkiaBhrjkIE4M",
+  authDomain: "youth-connect-rwanda.firebaseapp.com",
+  projectId: "youth-connect-rwanda",
+  storageBucket: "youth-connect-rwanda.firebasestorage.app",
+  messagingSenderId: "447571663541",
+  appId: "1:447571663541:web:058c71f45f0761f10ebcfc"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// SIGN UP (NOW SAVES NAME)
+window.signup = async function () {
+
+  let name = document.getElementById("name").value;
+  let email = document.getElementById("email").value;
+  let password = document.getElementById("password").value;
+
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+    const user = userCredential.user;
+
+    // SAVE USER PROFILE
+    await setDoc(doc(db, "users", user.uid), {
+      name: name,
+      email: email
+    });
+
+    alert("Account created successfully!");
+  } catch (err) {
+    alert(err.message);
+  }
+};
+
+// LOGIN
+window.login = function () {
+
+  let email = document.getElementById("email").value;
+  let password = document.getElementById("password").value;
+
+  signInWithEmailAndPassword(auth, email, password)
+    .then(() => {
+      alert("Login successful");
+      window.location.href = "dashboard.html";
+    })
+    .catch(err => alert(err.message));
+};
+
+</script>
+
+</body>
+</html>

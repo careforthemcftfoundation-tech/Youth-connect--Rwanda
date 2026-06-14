@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Messages - YouthConnect</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      background: #f0f2f5;
+      display: flex;
+      height: 100vh;
+    }
+
+    .sidebar {
+      width: 220px;
+      background: #1f2937;
+      color: white;
+      padding: 20px;
+    }
+
+    .menu li {
+      list-style: none;
+      padding: 10px;
+      margin: 6px 0;
+      background: #374151;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background: white;
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .chatBox {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+    }
+
+    .msg {
+      background: white;
+      padding: 8px;
+      margin: 5px 0;
+      border-radius: 8px;
+    }
+
+    .inputBox {
+      display: flex;
+      padding: 10px;
+      background: white;
+      border-top: 1px solid #ddd;
+    }
+
+    input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+
+    button {
+      margin-left: 8px;
+      background: #1877f2;
+      color: white;
+      border: none;
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <h2>Messages</h2>
+  <ul class="menu">
+    <li onclick="goHome()">Home</li>
+    <li onclick="goProfile()">Profile</li>
+  </ul>
+</div>
+
+<!-- MAIN CHAT -->
+<div class="main">
+
+  <div class="header">
+    <b>Global Chat (Beta)</b>
+  </div>
+
+  <div class="chatBox" id="chatBox"></div>
+
+  <div class="inputBox">
+    <input id="msg" placeholder="Type message...">
+    <button onclick="send()">Send</button>
+  </div>
+
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  query,
+  orderBy,
+  onSnapshot,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+import {
+  getAuth,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCcHlQTDGsF5lBNNzrOtpRkiaBhrjkIE4M",
+  authDomain: "youth-connect-rwanda.firebaseapp.com",
+  projectId: "youth-connect-rwanda"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+let uid = "";
+let name = "";
+
+onAuthStateChanged(auth, (user) => {
+  if (!user) {
+    window.location.href = "index.html";
+    return;
+  }
+
+  uid = user.uid;
+  name = user.email.split("@")[0];
+
+  loadMessages();
+});
+
+/* LOAD CHAT */
+function loadMessages() {
+  const q = query(collection(db, "messages"), orderBy("time"));
+
+  onSnapshot(q, (snap) => {
+    const box = document.getElementById("chatBox");
+    box.innerHTML = "";
+
+    snap.forEach(m => {
+      const msg = m.data();
+
+      box.innerHTML += `
+        <div class="msg">
+          <b>${msg.name}:</b> ${msg.text}
+        </div>
+      `;
+    });
+
+    box.scrollTop = box.scrollHeight;
+  });
+}
+
+/* SEND MESSAGE */
+window.send = async function () {
+  const text = document.getElementById("msg").value;
+  if (!text) return;
+
+  await addDoc(collection(db, "messages"), {
+    text,
+    uid,
+    name,
+    time: serverTimestamp()
+  });
+
+  document.getElementById("msg").value = "";
+};
+
+/* NAV */
+window.goHome = () => window.location.href = "dashboard.html";
+window.goProfile = () => window.location.href = "profile.html?id=" + uid;
+
+</script>
+
+</body>
+</html>
